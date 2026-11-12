@@ -1,0 +1,33 @@
+# CI 는 형식·문법 검사만 한다. plan/apply 는 API key 가 필요해 로컬에서 승인 후 실행(ADR-095).
+name: terraform
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dir: [uptime]
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.17.1
+          terraform_wrapper: false
+      - name: fmt
+        run: terraform fmt -check -recursive -diff
+      # -backend=false: state 없이 provider 만 받는다. lock 파일과 다른 provider 가 오면 실패한다.
+      - name: init
+        run: terraform init -backend=false -input=false -lockfile=readonly
+      - name: validate
+        run: terraform validate

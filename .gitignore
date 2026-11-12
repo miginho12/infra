@@ -1,0 +1,24 @@
+# Terraform 작업 폴더(provider 바이너리)
+.terraform/
+
+# state 는 비밀(웹훅 URL 등)을 평문으로 담는다 → Git 금지, 노트북 age 백업으로만 보관
+*.tfstate
+*.tfstate.*
+
+# 변수 파일·plan 파일도 비밀을 담을 수 있다
+*.tfvars
+*.tfvars.json
+*.tfplan
+tfplan
+
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# 로컬 비밀 파일(실제 위치는 ~/.config/clog-infra — 실수 대비)
+*.env
