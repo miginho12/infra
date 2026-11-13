@@ -15,11 +15,13 @@ locals {
   # cloudflared → 클러스터 안 frontend nginx (Service 이름은 gitops apps/clog-frontend)
   frontend_origin = "http://clog-frontend-prod.prod.svc.cluster.local:80"
 
-  # 보안·HTTPS 관련만 코드로. 값은 2026-11-14 현재 그대로(바꿀 때는 plan → 승인 → apply)
+  # 보안·HTTPS 관련만 코드로(바꿀 때는 plan → 승인 → apply). import 때(11-14) 값에서 바꾼 것:
+  #   always_use_https off → on : http 요청이 그대로 200(로그인 POST 도 http 로 도착) — HSTS(nginx)는 첫 방문을 못 지킨다
+  #   min_tls_version 1.0 → 1.2 : 1.0·1.1 퇴출. 앱 최소 Android 7·iOS 15 는 1.2 지원
   zone_settings = {
     ssl                      = "full"
-    always_use_https         = "off"
-    min_tls_version          = "1.0"
+    always_use_https         = "on"
+    min_tls_version          = "1.2"
     tls_1_3                  = "on"
     automatic_https_rewrites = "on"
     security_level           = "medium"
