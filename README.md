@@ -5,6 +5,9 @@ clog 의 클러스터 **밖** 인프라를 Terraform 으로 관리한다. 클러
 | 폴더 | 내용 |
 |---|---|
 | `uptime/` | 외부 업타임 감시 — UptimeRobot 키워드 감시 + Healthchecks.io dead-man switch(Alertmanager Watchdog) |
+| `cloudflare/` | 진입점 — `climb-log.com` DNS(→ Tunnel)·터널 라우팅·보안 zone 설정 (대시보드 기존 설정을 import, 아래) |
+
+폴더마다 state 가 따로다(한쪽 apply 가 다른 쪽을 건드리지 않게).
 
 ## 원칙
 
@@ -119,3 +122,34 @@ terraform output -raw watchdog_ping_url | kubectl create secret generic alertman
 
 알림 확인 후 파일 삭제 → plan(삭제 2) → apply → `terraform plan` No changes.
 2026-11-12 결과: UptimeRobot DOWN 약 1.5분, Healthchecks DOWN 2분, Discord `#uptime`·메일 모두 수신.
+
+## cloudflare/ — 진입점
+
+```
+https://climb-log.com ─ DNS CNAME(proxied) ─▶ Tunnel clog-prod ─ cloudflared(prod, 2 replica) ─▶ clog-frontend-prod:80
+                                                └ 그 밖의 hostname → http_status:404
+```
+
+| 리소스 | 관리 | 비고 |
+|---|---|---|
+| `cloudflare_dns_record.apex` | ✅ | `prevent_destroy` — 지우면 사이트가 바로 내려간다 |
+| `cloudflare_zero_trust_tunnel_cloudflared_config.clog_prod` | ✅ | `prevent_destroy`. ⚠ provider #7395: destroy 해도 실제 라우팅은 남는다 |
+| `cloudflare_zone_setting.this[...]` | ✅ | ssl·always_use_https·min_tls_version·tls_1_3·automatic_https_rewrites·security_level |
+| 터널 `clog-prod` | 읽기(data) | 리소스로 두면 `tunnel_secret` 을 API 가 안 돌려줘 교체 plan 위험 → 토큰은 gitops SealedSecret |
+| `www.climb-log.com` A | ❌ | 외부 IP 로 521 — 처리 방식 결정 전 |
+| 터널 `k3s-home-server` | ❌ | 다른 프로젝트 |
+
+- ID 는 코드에 쓰지 않는다(public 저장소) — zone·터널을 이름으로 조회.
+- 토큰: `cloudflare.env` 의 `CLOUDFLARE_API_TOKEN`. **plan·import 는 읽기 전용 토큰**(Zone·DNS·Zone Settings·Cloudflare Tunnel Read,
+  zone 은 climb-log.com 만 보임 확인). 실제로 바꿀 때만 쓰기 토큰을 따로 만들고, apply 중 `clog-frontend e2e/rollout_probe.sh` 로 측정.
+- 대시보드에서 직접 바꾸면 `terraform plan` 에 차이(drift)로 나온다 → 코드로 옮기거나 되돌린다.
+
+### 새 리소스를 import 할 때
+
+1. `cf-terraforming generate --zone <zone_id> --resource-type <type> --terraform-binary-path $(command -v terraform)` 로 초안
+   (출력에 ID 가 있으니 저장소 밖에), 코드로 옮길 때 ID 는 data source 참조로 바꾼다.
+2. `imports.tf`(.gitignore — 실제 ID) 에 `import { to = … id = "…" }`.
+3. `terraform plan` 이 **"N to import, 0 to add, 0 to change, 0 to destroy"** 가 될 때까지 코드를 실제 값에 맞춘다.
+4. apply(import 만이라 Cloudflare 로 쓰기 없음) → `rm imports.tf` → `chmod 600 terraform.tfstate*` → `terraform plan` No changes.
+
+2026-11-14 첫 import: 8개(DNS 1·터널 라우팅 1·zone 설정 6), plan 8 to import·0 변경 → apply 후 No changes, 사이트 200 유지.

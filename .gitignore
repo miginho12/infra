@@ -22,3 +22,6 @@ terraform.rc
 
 # 로컬 비밀 파일(실제 위치는 ~/.config/clog-infra — 실수 대비)
 *.env
+
+# import 블록(실제 ID 포함) — import 끝나면 지운다. public 저장소에 ID 를 남기지 않는다
+imports.tf
