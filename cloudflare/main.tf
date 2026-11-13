@@ -6,7 +6,6 @@
 # 관리하지 않는 것
 # - 터널 자체(clog-prod): 읽기만(data). 리소스로 두면 API 가 tunnel_secret 을 돌려주지 않아 교체(재생성)
 #   plan 이 나올 수 있고, 터널이 바뀌면 cloudflared 토큰이 무효 → 사이트 다운. 토큰은 gitops SealedSecret.
-# - www.climb-log.com A 레코드: 터널이 아닌 외부 IP 로 521 — 처리 방식 결정 전(ADR-096 남은 일).
 # - 다른 프로젝트 터널(k3s-home-server: gangazido.com).
 
 locals {
@@ -90,4 +89,46 @@ resource "cloudflare_zone_setting" "this" {
   zone_id    = data.cloudflare_zone.this.zone_id
   setting_id = each.key
   value      = each.value
+}
+
+# www → apex 301 (2026-11-14). 리다이렉트는 Cloudflare 엣지에서 끝나 원 서버로 가지 않는다.
+# 레코드는 proxied 여야 규칙이 적용된다 → 대상은 문서용 예약 주소 192.0.2.1(RFC 5737, 라우팅되지 않음).
+# 이전 대상(터널이 아닌 외부 IP, 521)은 소유가 불명확 — 그 IP 가 남에게 재할당되면 www 가 모르는 서버로
+# 프록시될 수 있어 바꾼다. 규칙이 빠지면 www 는 52x 로 실패(앱이 다른 출처로 뜨지 않음 → 로그인 깨짐 없음).
+resource "cloudflare_dns_record" "www" {
+  zone_id = data.cloudflare_zone.this.zone_id
+  name    = "www.${local.zone_name}"
+  type    = "A"
+  content = "192.0.2.1"
+  proxied = true
+  ttl     = 1
+  tags    = []
+  comment = "redirect-only: www → apex (cloudflare_ruleset.redirect)"
+}
+
+# zone 의 http_request_dynamic_redirect 진입점(phase 당 하나). 11-14 기준 없음 → 새로 만든다.
+resource "cloudflare_ruleset" "redirect" {
+  zone_id     = data.cloudflare_zone.this.zone_id
+  name        = "redirects"
+  description = "Single Redirects (Terraform 관리)"
+  kind        = "zone"
+  phase       = "http_request_dynamic_redirect"
+
+  rules = [
+    {
+      ref         = "www_to_apex"
+      description = "www.climb-log.com → https://climb-log.com (경로·쿼리 유지, 301)"
+      expression  = "(http.host eq \"www.${local.zone_name}\")"
+      action      = "redirect"
+      action_parameters = {
+        from_value = {
+          status_code           = 301
+          preserve_query_string = true
+          target_url = {
+            expression = "concat(\"https://${local.zone_name}\", http.request.uri.path)"
+          }
+        }
+      }
+    },
+  ]
 }

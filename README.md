@@ -135,14 +135,18 @@ https://climb-log.com ─ DNS CNAME(proxied) ─▶ Tunnel clog-prod ─ cloudfl
 |---|---|---|
 | `cloudflare_dns_record.apex` | ✅ | `prevent_destroy` — 지우면 사이트가 바로 내려간다 |
 | `cloudflare_zero_trust_tunnel_cloudflared_config.clog_prod` | ✅ | `prevent_destroy`. ⚠ provider #7395: destroy 해도 실제 라우팅은 남는다 |
-| `cloudflare_zone_setting.this[...]` | ✅ | ssl·always_use_https·min_tls_version·tls_1_3·automatic_https_rewrites·security_level |
+| `cloudflare_zone_setting.this[...]` | ✅ | ssl·always_use_https(**on**, 11-14)·min_tls_version(**1.2**, 11-14)·tls_1_3·automatic_https_rewrites·security_level |
 | 터널 `clog-prod` | 읽기(data) | 리소스로 두면 `tunnel_secret` 을 API 가 안 돌려줘 교체 plan 위험 → 토큰은 gitops SealedSecret |
-| `www.climb-log.com` A | ❌ | 외부 IP 로 521 — 처리 방식 결정 전 |
+| `cloudflare_dns_record.www` | ✅ | redirect 전용 — proxied A `192.0.2.1`(RFC 5737 예약, 라우팅 안 됨). 11-14 이전엔 소유 불명 외부 IP 로 521 |
+| `cloudflare_ruleset.redirect` | ✅ | `http_request_dynamic_redirect`: `www.climb-log.com/*` → `https://climb-log.com/*` 301(쿼리 유지). 엣지에서 끝나 원 서버로 안 감 |
 | 터널 `k3s-home-server` | ❌ | 다른 프로젝트 |
 
 - ID 는 코드에 쓰지 않는다(public 저장소) — zone·터널을 이름으로 조회.
-- 토큰: `cloudflare.env` 의 `CLOUDFLARE_API_TOKEN`. **plan·import 는 읽기 전용 토큰**(Zone·DNS·Zone Settings·Cloudflare Tunnel Read,
-  zone 은 climb-log.com 만 보임 확인). 실제로 바꿀 때만 쓰기 토큰을 따로 만들고, apply 중 `clog-frontend e2e/rollout_probe.sh` 로 측정.
+- 토큰: `cloudflare.env` 의 `CLOUDFLARE_API_TOKEN`. **plan·import 는 읽기 전용 토큰**(Zone·DNS·Zone Settings·Single Redirect Read +
+  Account Cloudflare Tunnel Read, zone 은 climb-log.com 만 보임 확인). 실제로 바꿀 때만 쓰기 토큰(`cloudflare.write` — `.env` 가 아니라
+  기본 반복문에 안 들어감, Zone Settings·DNS·Single Redirect Edit + Tunnel Read, **만료 짧게**)을 `source` 해서 apply 하고 끝나면 폐기.
+  ⚠ 쓰기 토큰에도 Tunnel Read 가 필요(data source 조회), 읽기 토큰에도 Single Redirect Read 가 필요(ruleset 조회) — 없으면 plan 이 403.
+  ruleset 은 plan 때 `dry_run=true` 로 검증되며 이때도 쓰기 권한이 필요(읽기 토큰 plan 은 경고만, 생성은 apply 때 서버가 검증).
 - 대시보드에서 직접 바꾸면 `terraform plan` 에 차이(drift)로 나온다 → 코드로 옮기거나 되돌린다.
 
 ### 새 리소스를 import 할 때
@@ -154,3 +158,4 @@ https://climb-log.com ─ DNS CNAME(proxied) ─▶ Tunnel clog-prod ─ cloudfl
 4. apply(import 만이라 Cloudflare 로 쓰기 없음) → `rm imports.tf` → `chmod 600 terraform.tfstate*` → `terraform plan` No changes.
 
 2026-11-14 첫 import: 8개(DNS 1·터널 라우팅 1·zone 설정 6), plan 8 to import·0 변경 → apply 후 No changes, 사이트 200 유지.
+같은 날 변경: always_use_https on·min_tls 1.2(TLS 1.0·1.1 거부까지 엣지 반영 수십 초), www → apex 301(www 레코드 import + 대상 교체 + ruleset 생성).
