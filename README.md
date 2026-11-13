@@ -100,10 +100,11 @@ terraform output -raw watchdog_ping_url | kubectl create secret generic alertman
 
 ### state 백업·복구
 
-- **백업:** 노트북 `pull-backup.ps1` 이 매일 `ssh … tfstate` 로 암호문을 받아 크기·SHA256·version·serial 을 검증하고
-  `%USERPROFILE%\clog-backup\tfstate\tfstate-uptime-<serial>-<sha12>.json.age` 로 저장한 뒤 `ack-tfstate`.
-  이름이 내용 해시라 state 가 바뀔 때만 새 파일. 72h 동안 ack 가 없으면 `ClogTfstateBackupStale`.
-- **복구(노트북 사본):** `age -d -i keys\age.key <최신>.json.age > uptime/terraform.tfstate` → `terraform plan` 이 No changes.
+- **백업:** 노트북 `pull-backup.ps1` 이 매일 stack 마다(`$TfStacks` = uptime·cloudflare) `ssh … tfstate <stack>` 로 암호문을 받아
+  크기·SHA256·version·serial 을 검증하고 `%USERPROFILE%\clog-backup\tfstate\tfstate-<stack>-<serial>-<sha12>.json.age` 로 저장한 뒤 `ack-tfstate`.
+  이름이 내용 해시라 state 가 바뀔 때만 새 파일. stack 별로 72h 동안 ack 가 없으면 `ClogTfstateBackupStale`, 지표가 없으면 `MetricMissing`.
+  **새 stack(폴더)을 만들면** gitops `scripts/backup-export.sh` 의 `TFSTATE_STACKS`, `pull-backup.ps1` 의 `$TfStacks`, 알림 룰 MetricMissing 에 함께 추가.
+- **복구(노트북 사본):** `age -d -i keys\age.key tfstate-<stack>-…json.age > <stack>/terraform.tfstate` → `terraform plan` 이 No changes.
 - **복구(사본도 없을 때):** 4개 리소스 모두 import 가능.
   ```bash
   terraform import uptimerobot_integration.discord <integration id>
