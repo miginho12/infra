@@ -1,0 +1,36 @@
+# Dependabot (2026-11-14) — PR 은 제안일 뿐, 병합 전 로컬 plan 으로 변경 0 확인 후 사람이 병합한다.
+# - cooldown 14일: 배포 직후 버전은 피하고 약 2주 지난 버전만 받는다(ADR-095·096 의 버전 고정 원칙을 자동화)
+# - Terraform 버전은 versions.tf 에 정확히(=) 고정 → PR 이 versions.tf + .terraform.lock.hcl 을 함께 바꾼다.
+#   ⚠ 첫 PR 에서 lock 에 linux_arm64(Pi) 해시가 남아 있는지 확인(CI 는 amd64 라 못 잡음): Pi 에서 terraform init
+version: 2
+updates:
+  - package-ecosystem: "terraform"
+    directories:
+      - "/uptime"
+      - "/cloudflare"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      # uptimerobot provider 공식 문서: 2.0.0 은 잘못 배포됐다 삭제된 버전(issue #299) — 1.x 안에서만
+      - dependency-name: "uptimerobot/uptimerobot"
+        versions: ["2.0.0"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "chore(deps)"
