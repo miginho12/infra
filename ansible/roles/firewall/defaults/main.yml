@@ -1,6 +1,6 @@
-# 처음 도입은 false — 파일·서비스만 깔고 켜지는 않는다. 적용은 사용자가 자동 되돌리기 타이머를 건 뒤 수동으로
-# (README "방화벽 적용 절차"). 확인이 끝나면 true 로 바꿔 부팅 때도 켜지게 한다.
-firewall_enabled: false
+# 2026-11-14 켬: 10분 자동 되돌리기 타이머를 건 뒤 start → SSH(LAN·Tailscale)·사이트·targets 18/18·NodePort(Tailscale)
+# 확인 → 타이머 취소 → true(부팅 때도 켜짐). 처음 켤 때는 README "방화벽 적용 절차" 를 따른다.
+firewall_enabled: true
 
 # 집 LAN 쪽 인터페이스(지금은 Wi-Fi 만 연결, 유선은 꽂으면 같은 규칙)
 firewall_lan_ifaces:
