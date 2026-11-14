@@ -1,0 +1,29 @@
+# 호스트 방화벽 (2026-11-14, ADR-099) — nftables 별도 테이블 inet clog_host.
+# input 기본 차단(LAN 은 SSH·Tailscale·mDNS·DHCP 만, Tailscale·Pod·docker 는 허용), LAN→NodePort 는 forward 에서 차단.
+# 처음엔 firewall_enabled=false — 파일·서비스만 깔고 켜지 않는다. 켜는 절차는 README "방화벽 적용 절차"(자동 되돌리기 타이머).
+- name: 규칙 파일(문법 검사 후 설치)
+  ansible.builtin.template:
+    src: clog-firewall.nft.j2
+    dest: /etc/clog-firewall.nft
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/nft -c -f %s
+  notify: Clog-firewall reload
+
+- name: Systemd 서비스
+  ansible.builtin.copy:
+    src: clog-firewall.service
+    dest: /etc/systemd/system/clog-firewall.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Systemd daemon-reload
+
+- name: 서비스 켜기(firewall_enabled 일 때만)
+  ansible.builtin.systemd_service:
+    name: clog-firewall
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: firewall_enabled | bool

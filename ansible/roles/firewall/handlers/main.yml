@@ -1,0 +1,10 @@
+- name: Systemd daemon-reload
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# 켜져 있을 때만 다시 읽는다(규칙 파일은 validate 를 통과한 상태). 꺼져 있으면 아무것도 하지 않는다.
+- name: Clog-firewall reload
+  ansible.builtin.systemd_service:
+    name: clog-firewall
+    state: reloaded
+  when: firewall_enabled | bool

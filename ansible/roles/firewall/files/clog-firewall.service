@@ -1,0 +1,18 @@
+[Unit]
+Description=clog host firewall (nftables table inet clog_host only)
+Documentation=https://github.com/miginho12/infra/tree/main/ansible
+# 우리 테이블만 넣고 뺀다 — k3s·docker 규칙(iptables-nft)은 건드리지 않는다. Debian nftables.service(flush ruleset)는 쓰지 않음.
+Wants=network-pre.target
+Before=network-pre.target
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/clog-firewall.nft
+ExecReload=/usr/sbin/nft -f /etc/clog-firewall.nft
+ExecStop=/usr/sbin/nft delete table inet clog_host
+
+[Install]
+WantedBy=multi-user.target

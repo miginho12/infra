@@ -185,3 +185,34 @@ cd ansible
 
 - `roles/*/files/` 는 **Pi 의 실제 파일을 바이트 그대로** 복사한 것 — 주석을 넣으면 내용이 달라져 변경으로 잡힌다(설명은 tasks 에).
 - 관리하지 않음: k3s(자체 설치 스크립트), docker·tailscale 설치/로그인, 비밀번호·SSH 키, 방화벽(별도 계획).
+
+### 방화벽 (`firewall` role, 2026-11-14)
+
+nftables **별도 테이블 `inet clog_host`** 만 넣고 뺀다(`/etc/clog-firewall.nft` + `clog-firewall.service`).
+Debian 기본 `nftables.conf`(`flush ruleset`)는 쓰지 않는다 — k3s·docker 규칙(iptables-nft)이 같은 nftables 에 있다.
+
+| 출발 | 허용 | 차단 |
+|---|---|---|
+| 집 LAN(wlan0·eth0) | SSH 22, Tailscale 41641/udp, mDNS, DHCP | 6443(apiserver)·10250(kubelet)·9100(node-exporter, 인증 없음)·8472(flannel VXLAN)·**NodePort 30000-32767**(forward 에서) |
+| Tailscale | 전부(접근 제어는 Tailscale ACL) | — |
+| Pod·docker(cni0·flannel.1·docker0·br-*, 10.42/16·10.43/16) | 전부 | — |
+| 나가는 트래픽 | 그대로 | — |
+
+NodePort(Grafana 30300·ArgoCD 30728·Prometheus 30090 등)는 Tailscale IP 로 연다.
+규칙은 격리 network namespace(`unshare -rn`)에서 가짜 LAN·Tailscale·Pod 클라이언트로 시험했다(LAN 22 만 열림, NodePort DNAT 차단, 재적용 멱등, 테이블 삭제로 원복).
+
+#### 방화벽 적용 절차 (처음 한 번, 사용자 터미널)
+
+```bash
+cd ~/project/infra/ansible
+./run.sh --diff -K                         # 규칙 파일·서비스 설치(firewall_enabled=false — 아직 안 켬)
+# 1) 자동 되돌리기 타이머부터 — 10분 뒤 우리 테이블 삭제(잘못돼 접속이 끊겨도 스스로 복구)
+sudo systemd-run --unit=clog-fw-rollback --on-active=10min /usr/sbin/nft delete table inet clog_host
+# 2) 켜기(enable 은 아직 안 함 — 재부팅하면 꺼진 상태로 돌아온다)
+sudo systemctl start clog-firewall
+# 3) 확인: 새 SSH 접속(LAN·Tailscale), 사이트·Prometheus targets·노트북 백업 → 이상 없으면
+sudo systemctl stop clog-fw-rollback.timer  # 되돌리기 취소
+# 4) defaults firewall_enabled: true 로 바꿔 커밋 → ./run.sh --diff -K (부팅 때도 켜짐)
+```
+
+끄기: `sudo systemctl stop clog-firewall`(우리 테이블만 삭제). 막힌 패킷 수: `sudo nft list chain inet clog_host input`.

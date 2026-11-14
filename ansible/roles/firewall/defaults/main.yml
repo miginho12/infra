@@ -1,0 +1,13 @@
+# 처음 도입은 false — 파일·서비스만 깔고 켜지는 않는다. 적용은 사용자가 자동 되돌리기 타이머를 건 뒤 수동으로
+# (README "방화벽 적용 절차"). 확인이 끝나면 true 로 바꿔 부팅 때도 켜지게 한다.
+firewall_enabled: false
+
+# 집 LAN 쪽 인터페이스(지금은 Wi-Fi 만 연결, 유선은 꽂으면 같은 규칙)
+firewall_lan_ifaces:
+  - wlan0
+  - eth0
+
+# k3s 기본 Pod·Service 대역 — Pod 에서 호스트(kubelet 10250·node-exporter 9100·apiserver 6443)로 오는 트래픽
+firewall_cluster_cidrs:
+  - 10.42.0.0/16
+  - 10.43.0.0/16
