@@ -148,6 +148,10 @@ https://climb-log.com ─ DNS CNAME(proxied) ─▶ Tunnel clog-prod ─ cloudfl
   ⚠ 쓰기 토큰에도 Tunnel Read 가 필요(data source 조회), 읽기 토큰에도 Single Redirect Read 가 필요(ruleset 조회) — 없으면 plan 이 403.
   ruleset 은 plan 때 `dry_run=true` 로 검증되며 이때도 쓰기 권한이 필요(읽기 토큰 plan 은 경고만, 생성은 apply 때 서버가 검증).
 - 대시보드에서 직접 바꾸면 `terraform plan` 에 차이(drift)로 나온다 → 코드로 옮기거나 되돌린다.
+- **drift 주기 점검**: `scripts/drift-check.sh`(uptime·cloudflare, 읽기 전용 plan `-lock=false`)를 매일 07:00 KST user crontab 으로
+  실행(`scripts/crontab.txt` → `crontab scripts/crontab.txt`) → textfile 지표 `clog_terraform_drift{stack}` 등 →
+  알림 TerraformDriftDetected·CheckFailing·CheckStale(36h)·MetricMissing. 마지막 plan 출력: `~/.local/state/clog-infra/drift-<stack>.log`.
+  linger 가 꺼져 있어 systemd user timer 대신 cron(로그인 무관).
 
 ### 새 리소스를 import 할 때
 
