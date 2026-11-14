@@ -1,0 +1,13 @@
+# Pi 호스트 설정 (2026-11-14, ADR-097) — 감사 M8(11-10·11-11)에 손으로 적용한 것을 코드로.
+# 첫 도입은 "지금 값 그대로": ./run.sh --check --diff -K 가 changed=0 이어야 한다(Terraform import 의 변경 0 과 같은 기준).
+#
+# 관리하지 않는 것: k3s(자체 설치 스크립트 — 재설치 위험), docker·tailscale 설치/로그인, 사용자 비밀번호·SSH 키(비밀),
+#   방화벽(아직 없음 — 잘못 넣으면 SSH·k3s 네트워크가 끊겨 별도 계획으로).
+- name: Pi 호스트 설정
+  hosts: pi
+  become: true
+  roles:
+    - ssh_hardening
+    - unattended_upgrades
+    - textfile_collector
+    - user_crontab

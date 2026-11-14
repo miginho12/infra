@@ -1,0 +1,9 @@
+# node-exporter textfile 지표 폴더 — 백업 ack(gitops scripts/backup-export.sh)·Terraform drift(infra scripts/drift-check.sh)가
+# miginho 로 쓰고, node-exporter(uid 65534, hostPath /host/root) 가 읽는다 → miginho 소유 755, 파일은 각 스크립트가 644.
+- name: Textfile collector 폴더
+  ansible.builtin.file:
+    path: /var/lib/node_exporter/textfile_collector
+    state: directory
+    owner: miginho
+    group: miginho
+    mode: "0755"

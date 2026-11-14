@@ -31,3 +31,19 @@ jobs:
         run: terraform init -backend=false -input=false -lockfile=readonly
       - name: validate
         run: terraform validate
+
+  # Ansible(Pi 호스트 설정, 2026-11-14): 문법·린트만. 실제 점검·적용은 Pi 에서 사용자가 sudo 로(ansible/run.sh).
+  ansible:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ansible
+    env:
+      UV_PYTHON: "3.13"   # ansible-core 2.21 은 Python 3.12 이상, Pi 와 같은 3.13
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - name: syntax-check
+        run: ./run.sh --syntax-check
+      - name: ansible-lint
+        run: ./run.sh lint

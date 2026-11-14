@@ -5,6 +5,7 @@ clog 의 클러스터 **밖** 인프라를 Terraform 으로 관리한다. 클러
 | 폴더 | 내용 |
 |---|---|
 | `uptime/` | 외부 업타임 감시 — UptimeRobot 키워드 감시 + Healthchecks.io dead-man switch(Alertmanager Watchdog) |
+| `ansible/` | Pi 호스트 설정 — SSH 강화·자동 보안 업데이트·textfile 지표 폴더·user crontab (아래) |
 | `cloudflare/` | 진입점 — `climb-log.com` DNS(→ Tunnel)·터널 라우팅·보안 zone 설정 (대시보드 기존 설정을 import, 아래) |
 
 폴더마다 state 가 따로다(한쪽 apply 가 다른 쪽을 건드리지 않게).
@@ -163,3 +164,24 @@ https://climb-log.com ─ DNS CNAME(proxied) ─▶ Tunnel clog-prod ─ cloudfl
 
 2026-11-14 첫 import: 8개(DNS 1·터널 라우팅 1·zone 설정 6), plan 8 to import·0 변경 → apply 후 No changes, 사이트 200 유지.
 같은 날 변경: always_use_https on·min_tls 1.2(TLS 1.0·1.1 거부까지 엣지 반영 수십 초), www → apex 301(www 레코드 import + 대상 교체 + ruleset 생성).
+
+## ansible/ — Pi 호스트 설정
+
+Pi 자신에서 실행(`connection=local`), ansible-core **2.21.5** 를 uv 로 설치 없이(`ansible/run.sh`). sudo 비밀번호가 필요해 **사용자가 터미널에서** 돌린다.
+
+```bash
+cd ansible
+./run.sh --check --diff -K   # 바뀔 것만 보기(변경 없음이어야 정상: changed=0)
+./run.sh --diff -K           # 적용
+./run.sh lint                # ansible-lint(sudo 불필요, CI 와 같음)
+```
+
+| role | 관리 대상 | 비고 |
+|---|---|---|
+| `ssh_hardening` | `/etc/ssh/sshd_config.d/10-hardening.conf` | 비밀번호·키보드 인증 끔, root 금지, X11 끔. 바뀌면 `sshd -t` 통과 후에만 reload |
+| `unattended_upgrades` | 패키지 · `20auto-upgrades` · `52clog-security-only` · apt timer | 보안 출처만, 자동 재부팅 없음. `50unattended-upgrades` 는 패키지 기본 그대로(관리 안 함) |
+| `textfile_collector` | `/var/lib/node_exporter/textfile_collector` | miginho 755 — 백업 ack·drift 지표가 쓴다 |
+| `user_crontab` | miginho crontab = `scripts/crontab.txt` | 다를 때만 반영(`ansible.builtin.cron` 은 표시 줄을 넣어 안 씀) |
+
+- `roles/*/files/` 는 **Pi 의 실제 파일을 바이트 그대로** 복사한 것 — 주석을 넣으면 내용이 달라져 변경으로 잡힌다(설명은 tasks 에).
+- 관리하지 않음: k3s(자체 설치 스크립트), docker·tailscale 설치/로그인, 비밀번호·SSH 키, 방화벽(별도 계획).

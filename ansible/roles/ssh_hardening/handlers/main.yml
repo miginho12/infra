@@ -1,0 +1,13 @@
+# 전체 설정(sshd_config + 모든 drop-in)이 통과할 때만 reload — 잘못된 설정으로 SSH 가 끊기지 않게.
+# 같은 이름을 듣는 handler 는 정의 순서대로 돌고, 앞의 것이 실패하면 뒤의 것(reload)은 돌지 않는다.
+# restart 가 아니라 reload: 기존 접속은 유지된다.
+- name: Sshd 전체 설정 검사
+  listen: Sshd 설정 검사 후 reload
+  ansible.builtin.command: /usr/sbin/sshd -t
+  changed_when: false
+
+- name: Sshd reload
+  listen: Sshd 설정 검사 후 reload
+  ansible.builtin.systemd_service:
+    name: ssh
+    state: reloaded

@@ -1,0 +1,13 @@
+# SSH 키 전용·root 로그인 금지·X11 끔 (감사 M8, 2026-11-10 — 노트북 키 등록·접속 확인 후 적용했다).
+# sshd_config.d 는 먼저 읽힌 값이 이긴다 → 10- 로 50-cloud-init.conf 보다 앞에 둔다.
+# 파일 내용은 files/10-hardening.conf(현재 Pi 파일 그대로). 여기에 주석을 넣으면 내용이 달라져 변경으로 잡힌다.
+- name: Sshd 강화 drop-in
+  ansible.builtin.copy:
+    src: 10-hardening.conf
+    dest: /etc/ssh/sshd_config.d/10-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    # 조각 파일 자체가 sshd 설정으로 읽히는지(전체 설정 검사는 handler 에서 reload 전에)
+    validate: /usr/sbin/sshd -t -f %s
+  notify: Sshd 설정 검사 후 reload

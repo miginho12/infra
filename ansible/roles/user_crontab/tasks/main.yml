@@ -1,0 +1,21 @@
+# miginho user crontab = infra scripts/crontab.txt (원본). crontab 은 통째로 바뀌므로 파일과 다를 때만 반영한다.
+# ansible.builtin.cron 은 항목마다 "#Ansible:" 표시 줄을 넣어 현재 crontab 과 달라진다 → 쓰지 않는다.
+- name: 원본 crontab 파일 읽기
+  ansible.builtin.slurp:
+    src: "{{ playbook_dir }}/../scripts/crontab.txt"
+  register: user_crontab_src
+  become: false
+
+- name: 현재 crontab 읽기
+  ansible.builtin.command: crontab -l
+  register: user_crontab_now
+  changed_when: false
+  failed_when: user_crontab_now.rc not in [0, 1]   # 1 = crontab 없음
+  check_mode: false
+  become: false
+
+- name: Crontab 반영(다를 때만)
+  ansible.builtin.command: crontab {{ playbook_dir }}/../scripts/crontab.txt
+  when: (user_crontab_now.stdout + '\n') != (user_crontab_src.content | b64decode)
+  changed_when: true
+  become: false
